@@ -1,0 +1,42 @@
+# Demo: two ships, three ports.
+# Travel: 0<->1 takes 2 ticks, 1<->2 takes 2, 0<->2 takes 3.
+# Dock throughput (cargo operations per tick): port 0: 2, port 1: 1, port 2: 2.
+# Port 0 starts with 2 units bound for port 2 and 1 bound for port 1.
+{"command":"init","parameters":{"travel_times":[[0,2,3],[2,0,2],[3,2,0]],"dock_throughput":[2,1,2],"vessels":[{"id":"alpha","location":0},{"id":"bravo","location":1}],"cargo_manifest":[{"location":0,"destination":2,"quantity":2},{"location":0,"destination":1,"quantity":1}]}}
+
+# 1. Planned vs committed: orders can change freely until the next tick.
+{"command":"set_destination","parameters":{"vessel_id":"bravo","destination":0}}
+{"command":"set_destination","parameters":{"vessel_id":"bravo","destination":2}}
+{"command":"dock","parameters":{"vessel_id":"alpha"}}
+{"command":"get_state","parameters":{}}
+{"command":"tick","parameters":{}}
+
+# 2. Once a trip is committed, the ship can't be redirected.
+{"command":"set_destination","parameters":{"vessel_id":"bravo","destination":0}}
+
+# 3. Loading at port 0, which handles 2 operations per tick.
+{"command":"load","parameters":{"vessel_id":"alpha","destination":2}}
+{"command":"load","parameters":{"vessel_id":"alpha","destination":2}}
+{"command":"load","parameters":{"vessel_id":"alpha","destination":1}}
+# Only the net change counts: putting one unit back frees room for another.
+{"command":"unload","parameters":{"vessel_id":"alpha","destination":2}}
+{"command":"load","parameters":{"vessel_id":"alpha","destination":1}}
+{"command":"undock","parameters":{"vessel_id":"alpha"}}
+{"command":"tick","parameters":{}}
+
+# 4. alpha sails to port 1. New cargo shows up at port 2, where bravo just arrived.
+{"command":"set_destination","parameters":{"vessel_id":"alpha","destination":1}}
+{"command":"dock","parameters":{"vessel_id":"bravo"}}
+{"command":"tick","parameters":{"cargo_manifest":[{"location":2,"destination":0,"quantity":1}]}}
+{"command":"load","parameters":{"vessel_id":"bravo","destination":0}}
+{"command":"tick","parameters":{}}
+
+# 5. alpha docks at port 1 and delivers: cargo unloaded at its destination leaves the simulation.
+{"command":"dock","parameters":{"vessel_id":"alpha"}}
+{"command":"tick","parameters":{}}
+{"command":"unload","parameters":{"vessel_id":"alpha","destination":1}}
+{"command":"tick","parameters":{}}
+
+# 6. History: look back at tick 1, then confirm the present is untouched.
+{"command":"get_state_at","parameters":{"tick":1}}
+{"command":"get_state","parameters":{}}

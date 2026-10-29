@@ -1,0 +1,34 @@
+# Base problem: the worked example from the spec.
+# Setup: travel_times = [[0,4,7],[4,0,3],[7,3,0]]; v1 starts at 0, v2 at 2.
+# Ticks 2-3 were omitted in the spec and are filled in here.
+
+> {"command":"init","parameters":{"travel_times":[[0,4,7],[4,0,3],[7,3,0]],"vessels":[{"id":"v1","location":0},{"id":"v2","location":2}]}}
+< {"status":"ok","payload":{"tick":0,"vessels":{"v1":{"state":"idle","location":0},"v2":{"state":"idle","location":2}}}}
+
+# send v1 to location 2, then override to location 1 - both valid before tick
+> {"command":"set_destination","parameters":{"vessel_id":"v1","destination":2}}
+< {"status":"ok","payload":{"tick":0,"vessels":{"v1":{"state":"transit","from":0,"to":2,"arrives_at_tick":7},"v2":{"state":"idle","location":2}}}}
+> {"command":"set_destination","parameters":{"vessel_id":"v1","destination":1}}
+< {"status":"ok","payload":{"tick":0,"vessels":{"v1":{"state":"transit","from":0,"to":1,"arrives_at_tick":4},"v2":{"state":"idle","location":2}}}}
+
+# tick commits destination 1
+> {"command":"tick","parameters":{}}
+< {"status":"ok","payload":{"tick":1,"vessels":{"v1":{"state":"transit","from":0,"to":1,"arrives_at_tick":4},"v2":{"state":"idle","location":2}}}}
+
+# rejected - v1 is committed to transit since last tick
+> {"command":"set_destination","parameters":{"vessel_id":"v1","destination":2}}
+< {"status":"error","payload":{"message":"vessel v1 is not idle"}}
+
+# ticks 2-3: v1 still in transit
+> {"command":"tick","parameters":{}}
+< {"status":"ok","payload":{"tick":2,"vessels":{"v1":{"state":"transit","from":0,"to":1,"arrives_at_tick":4},"v2":{"state":"idle","location":2}}}}
+> {"command":"tick","parameters":{}}
+< {"status":"ok","payload":{"tick":3,"vessels":{"v1":{"state":"transit","from":0,"to":1,"arrives_at_tick":4},"v2":{"state":"idle","location":2}}}}
+
+# tick 4: v1 arrives at location 1
+> {"command":"tick","parameters":{}}
+< {"status":"ok","payload":{"tick":4,"vessels":{"v1":{"state":"idle","location":1},"v2":{"state":"idle","location":2}}}}
+
+# v1 arrived - can be commanded immediately
+> {"command":"set_destination","parameters":{"vessel_id":"v1","destination":2}}
+< {"status":"ok","payload":{"tick":4,"vessels":{"v1":{"state":"transit","from":1,"to":2,"arrives_at_tick":7},"v2":{"state":"idle","location":2}}}}

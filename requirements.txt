@@ -1,0 +1,1 @@
+# No third-party dependencies: the engine and tests use only the Python standard library.

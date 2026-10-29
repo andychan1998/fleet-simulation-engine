@@ -1,0 +1,2 @@
+{"command":"init","parameters":{"travel_times":[[0,4],[4,0]],"vessels":[{"id":"v1","location":0}]}}
+{"command":"tick","parameters":{}}

@@ -12,6 +12,12 @@ the ship to be idle as of the last tick) and their effects go into planned.
 A handler that changes anything works on a copy of planned and only replaces
 planned once the whole command has succeeded, so a rejected command never
 leaves a partial change behind.
+
+History
+-------
+Every committed state is kept in `history`, indexed by tick. A committed state
+is never modified after it is committed (handlers and tick work on copies), so
+history can keep the objects themselves without copying them again.
 """
 
 from __future__ import annotations
@@ -20,6 +26,7 @@ from fleetsim.model import DOCKED, IDLE, TRANSIT, World, add_units, take_unit, t
 from fleetsim.params import (
     CommandError,
     check_index,
+    check_int,
     check_str,
     get,
     parse_dock_throughput,
@@ -35,11 +42,13 @@ class Simulation:
         self.dock_throughput: list[int] = []
         self.committed: World | None = None
         self.planned: World | None = None
+        self.history: list[World] = []  # history[t] is the committed state at tick t
         self._handlers = {
             "init": self._init,
             "tick": self._tick,
             "set_destination": self._set_destination,
             "get_state": self._get_state,
+            "get_state_at": self._get_state_at,
             "dock": self._dock,
             "undock": self._undock,
             "load": self._load,
@@ -89,11 +98,20 @@ class Simulation:
             if vessel.state == TRANSIT and vessel.arrives_at_tick <= world.tick:
                 vessel.make_idle(vessel.destination)
         _add_manifest(world, manifest)  # 4. new cargo lands on the docks
-        self._commit(world)
+        self._commit(world)  # 5. save to history, 6. start a fresh plan
         return world.to_payload()
 
     def _get_state(self, params: dict) -> dict:
         return self.planned.to_payload()
+
+    def _get_state_at(self, params: dict) -> dict:
+        tick = check_int(get(params, "tick"), "tick")
+        current = self.committed.tick
+        if tick < 0:
+            raise CommandError(f"tick {tick} is out of range (must be 0 or more)")
+        if tick > current:
+            raise CommandError(f"tick {tick} is in the future (current tick: {current})")
+        return self.history[tick].to_payload()
 
     # ---- movement ----
 
@@ -210,8 +228,9 @@ class Simulation:
     # ---- helpers ----
 
     def _commit(self, world: World) -> None:
-        """Make `world` the new committed state and start a fresh plan from it."""
+        """Make `world` the new committed state, record it, and start a fresh plan from it."""
         self.committed = world
+        self.history.append(world)
         self.planned = world.clone()
 
     def _vessel_id(self, params: dict) -> str:

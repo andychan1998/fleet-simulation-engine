@@ -1,0 +1,47 @@
+# Follow-on 2 (history): the worked example from the spec. It continues from
+# the follow-on 1 example after tick 13, so the setup below replays those
+# commands (their responses are checked in cargo_example.txt).
+#
+# Not included: the spec's standalone get_state_at example (tick 5, v1 in
+# transit 0 -> 2 arriving at tick 7 with cargo). It can't happen with these
+# travel times: a trip from 0 to 2 takes 7 ticks, so it would have to start at
+# tick 0, before v1 could have docked and loaded anything.
+
+> {"command":"init","parameters":{"travel_times":[[0,4,7],[4,0,3],[7,3,0]],"dock_throughput":[2,4,1],"vessels":[{"id":"v1","location":0},{"id":"v2","location":2}]}}
+> {"command":"tick","parameters":{"cargo_manifest":[{"location":0,"destination":2,"quantity":1},{"location":0,"destination":1,"quantity":1}]}}
+> {"command":"dock","parameters":{"vessel_id":"v1"}}
+> {"command":"tick","parameters":{}}
+> {"command":"load","parameters":{"vessel_id":"v1","destination":2}}
+> {"command":"load","parameters":{"vessel_id":"v1","destination":1}}
+> {"command":"tick","parameters":{}}
+> {"command":"undock","parameters":{"vessel_id":"v1"}}
+> {"command":"get_state","parameters":{}}
+> {"command":"tick","parameters":{}}
+> {"command":"set_destination","parameters":{"vessel_id":"v1","destination":2}}
+> {"command":"tick","parameters":{}}
+> {"command":"tick","parameters":{}}
+> {"command":"tick","parameters":{}}
+> {"command":"tick","parameters":{}}
+> {"command":"tick","parameters":{}}
+> {"command":"tick","parameters":{}}
+> {"command":"tick","parameters":{}}
+> {"command":"dock","parameters":{"vessel_id":"v1"}}
+> {"command":"tick","parameters":{}}
+> {"command":"unload","parameters":{"vessel_id":"v1","destination":2}}
+> {"command":"tick","parameters":{}}
+
+# query state at a past tick
+> {"command":"get_state_at","parameters":{"tick":1}}
+< {"status":"ok","payload":{"tick":1,"vessels":{"v1":{"state":"idle","location":0,"cargo":[]},"v2":{"state":"idle","location":2,"cargo":[]}},"cargo":[{"location":0,"destination":2,"quantity":1},{"location":0,"destination":1,"quantity":1}]}}
+
+# query current tick - identical to get_state at tick boundary
+> {"command":"get_state_at","parameters":{"tick":13}}
+< {"status":"ok","payload":{"tick":13,"vessels":{"v1":{"state":"docked","location":2,"cargo":[{"destination":1,"quantity":1}]},"v2":{"state":"idle","location":2,"cargo":[]}},"cargo":[]}}
+
+# querying the future is an error
+> {"command":"get_state_at","parameters":{"tick":99}}
+< {"status":"error","payload":{"message":"tick 99 is in the future (current tick: 13)"}}
+
+# simulation state is unchanged after historical queries
+> {"command":"get_state","parameters":{}}
+< {"status":"ok","payload":{"tick":13,"vessels":{"v1":{"state":"docked","location":2,"cargo":[{"destination":1,"quantity":1}]},"v2":{"state":"idle","location":2,"cargo":[]}},"cargo":[]}}

@@ -1,0 +1,29 @@
+# Decisions: get_state_at returns committed states only (never pending
+# commands), from tick 0 up to the current tick.
+
+> {"command":"init","parameters":{"travel_times":[[0,2],[2,0]],"dock_throughput":[1,1],"vessels":[{"id":"v1","location":0}]}}
+> {"command":"get_state_at","parameters":{"tick":0}}
+< {"status":"ok","payload":{"tick":0,"vessels":{"v1":{"state":"idle","location":0,"cargo":[]}},"cargo":[]}}
+
+# a pending trip shows in get_state but not in get_state_at
+> {"command":"set_destination","parameters":{"vessel_id":"v1","destination":1}}
+> {"command":"get_state_at","parameters":{"tick":0}}
+< {"status":"ok","payload":{"tick":0,"vessels":{"v1":{"state":"idle","location":0,"cargo":[]}},"cargo":[]}}
+
+# bad ticks
+> {"command":"get_state_at","parameters":{"tick":-1}}
+< {"status":"error","payload":{"message":"tick -1 is out of range (must be 0 or more)"}}
+> {"command":"get_state_at","parameters":{"tick":1}}
+< {"status":"error","payload":{"message":"tick 1 is in the future (current tick: 0)"}}
+> {"command":"get_state_at","parameters":{"tick":true}}
+< {"status":"error","payload":{"message":"tick must be an integer"}}
+> {"command":"get_state_at","parameters":{}}
+< {"status":"error","payload":{"message":"missing parameter \"tick\""}}
+
+# each past tick keeps its own state
+> {"command":"tick","parameters":{}}
+> {"command":"tick","parameters":{}}
+> {"command":"get_state_at","parameters":{"tick":1}}
+< {"status":"ok","payload":{"tick":1,"vessels":{"v1":{"state":"transit","from":0,"to":1,"arrives_at_tick":2,"cargo":[]}},"cargo":[]}}
+> {"command":"get_state_at","parameters":{"tick":2}}
+< {"status":"ok","payload":{"tick":2,"vessels":{"v1":{"state":"idle","location":1,"cargo":[]}},"cargo":[]}}

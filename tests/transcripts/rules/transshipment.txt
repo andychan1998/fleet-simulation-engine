@@ -1,0 +1,36 @@
+# Spec rule: unloading at any port other than the cargo's destination leaves
+# it on that dock, where another ship can pick it up. It is delivered (and
+# leaves the simulation) only when unloaded at its destination.
+
+> {"command":"init","parameters":{"travel_times":[[0,1,5],[1,0,1],[5,1,0]],"dock_throughput":[1,1,1],"vessels":[{"id":"v1","location":0},{"id":"v2","location":1}],"cargo_manifest":[{"location":0,"destination":2,"quantity":1}]}}
+
+# v1 carries the unit from 0 to 1 and drops it there
+> {"command":"dock","parameters":{"vessel_id":"v1"}}
+> {"command":"tick","parameters":{}}
+> {"command":"load","parameters":{"vessel_id":"v1","destination":2}}
+> {"command":"undock","parameters":{"vessel_id":"v1"}}
+> {"command":"tick","parameters":{}}
+> {"command":"set_destination","parameters":{"vessel_id":"v1","destination":1}}
+> {"command":"tick","parameters":{}}
+> {"command":"dock","parameters":{"vessel_id":"v1"}}
+> {"command":"dock","parameters":{"vessel_id":"v2"}}
+> {"command":"tick","parameters":{}}
+> {"command":"unload","parameters":{"vessel_id":"v1","destination":2}}
+< {"status":"ok","payload":{"tick":4,"vessels":{"v1":{"state":"docked","location":1,"cargo":[]},"v2":{"state":"docked","location":1,"cargo":[]}},"cargo":[{"location":1,"destination":2,"quantity":1}]}}
+
+# v2 picks it up on the next tick (dock 1 handles 1 operation per tick)
+> {"command":"load","parameters":{"vessel_id":"v2","destination":2}}
+< {"status":"error","payload":{"message":"transfer of 2 operations exceeds dock throughput of 1 at location 1"}}
+> {"command":"tick","parameters":{}}
+> {"command":"load","parameters":{"vessel_id":"v2","destination":2}}
+<~ {"status":"ok"}
+
+# v2 delivers it at 2
+> {"command":"undock","parameters":{"vessel_id":"v2"}}
+> {"command":"tick","parameters":{}}
+> {"command":"set_destination","parameters":{"vessel_id":"v2","destination":2}}
+> {"command":"tick","parameters":{}}
+> {"command":"dock","parameters":{"vessel_id":"v2"}}
+> {"command":"tick","parameters":{}}
+> {"command":"unload","parameters":{"vessel_id":"v2","destination":2}}
+< {"status":"ok","payload":{"tick":8,"vessels":{"v1":{"state":"docked","location":1,"cargo":[]},"v2":{"state":"docked","location":2,"cargo":[]}},"cargo":[]}}

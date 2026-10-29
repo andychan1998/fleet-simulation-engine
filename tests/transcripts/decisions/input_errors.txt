@@ -1,0 +1,53 @@
+# Decisions: bad input gets an error response and the engine keeps going.
+# Booleans and decimals are rejected where an integer is expected (JSON true
+# would otherwise pass as Python's integer 1). Rejected commands change nothing.
+
+# malformed requests
+> not json
+< {"status":"error","payload":{"message":"invalid JSON: Expecting value"}}
+> [1, 2]
+< {"status":"error","payload":{"message":"request must be a JSON object"}}
+> {"parameters":{}}
+< {"status":"error","payload":{"message":"request must have a \"command\" string"}}
+> {"command":"fly","parameters":{}}
+< {"status":"error","payload":{"message":"unknown command: fly"}}
+> {"command":"init","parameters":[1]}
+< {"status":"error","payload":{"message":"\"parameters\" must be a JSON object"}}
+
+> {"command":"init","parameters":{"travel_times":[[0,1],[1,0]],"dock_throughput":[1,1],"vessels":[{"id":"v1","location":0}]}}
+
+# "parameters" can be left out when a command has none
+> {"command":"get_state"}
+<~ {"status":"ok"}
+
+# vessel_id
+> {"command":"set_destination","parameters":{"destination":1}}
+< {"status":"error","payload":{"message":"missing parameter \"vessel_id\""}}
+> {"command":"set_destination","parameters":{"vessel_id":1,"destination":1}}
+< {"status":"error","payload":{"message":"vessel_id must be a non-empty string"}}
+> {"command":"set_destination","parameters":{"vessel_id":"v9","destination":1}}
+< {"status":"error","payload":{"message":"unknown vessel v9"}}
+> {"command":"dock","parameters":{"vessel_id":"v9"}}
+< {"status":"error","payload":{"message":"unknown vessel v9"}}
+
+# location numbers
+> {"command":"set_destination","parameters":{"vessel_id":"v1"}}
+< {"status":"error","payload":{"message":"missing parameter \"destination\""}}
+> {"command":"set_destination","parameters":{"vessel_id":"v1","destination":5}}
+< {"status":"error","payload":{"message":"destination 5 is out of range (0 to 1)"}}
+> {"command":"set_destination","parameters":{"vessel_id":"v1","destination":-1}}
+< {"status":"error","payload":{"message":"destination -1 is out of range (0 to 1)"}}
+> {"command":"set_destination","parameters":{"vessel_id":"v1","destination":true}}
+< {"status":"error","payload":{"message":"destination must be an integer"}}
+> {"command":"set_destination","parameters":{"vessel_id":"v1","destination":1.0}}
+< {"status":"error","payload":{"message":"destination must be an integer"}}
+> {"command":"set_destination","parameters":{"vessel_id":"v1","destination":"1"}}
+< {"status":"error","payload":{"message":"destination must be an integer"}}
+> {"command":"load","parameters":{"vessel_id":"v1","destination":null}}
+< {"status":"error","payload":{"message":"destination must be an integer"}}
+> {"command":"swap","parameters":{"vessel_id":"v1","load_destination":0}}
+< {"status":"error","payload":{"message":"missing parameter \"unload_destination\""}}
+
+# none of that changed anything
+> {"command":"get_state","parameters":{}}
+< {"status":"ok","payload":{"tick":0,"vessels":{"v1":{"state":"idle","location":0,"cargo":[]}},"cargo":[]}}

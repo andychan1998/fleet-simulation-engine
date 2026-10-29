@@ -1,0 +1,22 @@
+# Decision: cargo is listed in order of first arrival, and entries that reach
+# zero are removed, so cargo that comes back is listed at the end.
+# (Ship order is checked in tests/test_output_order.py, since a transcript
+# compares JSON objects without regard to key order.)
+
+> {"command":"init","parameters":{"travel_times":[[0,1,1],[1,0,1],[1,1,0]],"dock_throughput":[4,4,4],"vessels":[{"id":"v1","location":0}],"cargo_manifest":[{"location":0,"destination":2,"quantity":1},{"location":0,"destination":1,"quantity":1}]}}
+< {"status":"ok","payload":{"tick":0,"vessels":{"v1":{"state":"idle","location":0,"cargo":[]}},"cargo":[{"location":0,"destination":2,"quantity":1},{"location":0,"destination":1,"quantity":1}]}}
+> {"command":"dock","parameters":{"vessel_id":"v1"}}
+> {"command":"tick","parameters":{}}
+
+# the ship lists cargo in the order it was loaded
+> {"command":"load","parameters":{"vessel_id":"v1","destination":1}}
+> {"command":"load","parameters":{"vessel_id":"v1","destination":2}}
+< {"status":"ok","payload":{"tick":1,"vessels":{"v1":{"state":"docked","location":0,"cargo":[{"destination":1,"quantity":1},{"destination":2,"quantity":1}]}},"cargo":[]}}
+
+# unloading the destination-2 unit puts it back on the dock as a new entry
+> {"command":"unload","parameters":{"vessel_id":"v1","destination":2}}
+< {"status":"ok","payload":{"tick":1,"vessels":{"v1":{"state":"docked","location":0,"cargo":[{"destination":1,"quantity":1}]}},"cargo":[{"location":0,"destination":2,"quantity":1}]}}
+
+# duplicate manifest entries add up into one entry
+> {"command":"tick","parameters":{"cargo_manifest":[{"location":0,"destination":2,"quantity":2},{"location":0,"destination":2,"quantity":3}]}}
+<~ {"payload":{"cargo":[{"location":0,"destination":2,"quantity":6}]}}

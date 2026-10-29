@@ -1,0 +1,29 @@
+# Spec rules: before a tick, set_destination replaces a pending dock, dock
+# replaces a pending set_destination, and the latest set_destination wins.
+
+> {"command":"init","parameters":{"travel_times":[[0,2,3],[2,0,1],[3,1,0]],"dock_throughput":[1,1,1],"vessels":[{"id":"v1","location":0}]}}
+
+> {"command":"dock","parameters":{"vessel_id":"v1"}}
+> {"command":"set_destination","parameters":{"vessel_id":"v1","destination":2}}
+< {"status":"ok","payload":{"tick":0,"vessels":{"v1":{"state":"transit","from":0,"to":2,"arrives_at_tick":3,"cargo":[]}},"cargo":[]}}
+> {"command":"dock","parameters":{"vessel_id":"v1"}}
+< {"status":"ok","payload":{"tick":0,"vessels":{"v1":{"state":"docked","location":0,"cargo":[]}},"cargo":[]}}
+> {"command":"set_destination","parameters":{"vessel_id":"v1","destination":2}}
+> {"command":"set_destination","parameters":{"vessel_id":"v1","destination":1}}
+> {"command":"tick","parameters":{}}
+< {"status":"ok","payload":{"tick":1,"vessels":{"v1":{"state":"transit","from":0,"to":1,"arrives_at_tick":2,"cargo":[]}},"cargo":[]}}
+
+# once committed to a trip, nothing can change it
+> {"command":"dock","parameters":{"vessel_id":"v1"}}
+< {"status":"error","payload":{"message":"vessel v1 is not idle"}}
+> {"command":"undock","parameters":{"vessel_id":"v1"}}
+< {"status":"error","payload":{"message":"vessel v1 is not docked"}}
+> {"command":"set_destination","parameters":{"vessel_id":"v1","destination":0}}
+< {"status":"error","payload":{"message":"vessel v1 is not idle"}}
+
+# a docked ship must undock (and tick) before it can sail
+> {"command":"tick","parameters":{}}
+> {"command":"dock","parameters":{"vessel_id":"v1"}}
+> {"command":"tick","parameters":{}}
+> {"command":"set_destination","parameters":{"vessel_id":"v1","destination":2}}
+< {"status":"error","payload":{"message":"vessel v1 is not idle"}}

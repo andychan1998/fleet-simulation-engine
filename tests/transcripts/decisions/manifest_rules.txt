@@ -1,0 +1,36 @@
+# Decisions: any bad manifest entry rejects the whole command, so a tick with a
+# bad manifest does not advance and adds no cargo. Cargo can't start at its
+# own destination. An absent or null manifest means no new cargo.
+
+> {"command":"init","parameters":{"travel_times":[[0,1],[1,0]],"dock_throughput":[1,1],"vessels":[{"id":"v1","location":0}]}}
+
+# the first entry is fine, the second is not: nothing is added, the clock doesn't move
+> {"command":"tick","parameters":{"cargo_manifest":[{"location":0,"destination":1,"quantity":1},{"location":0,"destination":5,"quantity":1}]}}
+< {"status":"error","payload":{"message":"cargo_manifest[1].destination 5 is out of range (0 to 1)"}}
+> {"command":"get_state","parameters":{}}
+< {"status":"ok","payload":{"tick":0,"vessels":{"v1":{"state":"idle","location":0,"cargo":[]}},"cargo":[]}}
+
+> {"command":"tick","parameters":{"cargo_manifest":[{"location":0,"destination":0,"quantity":1}]}}
+< {"status":"error","payload":{"message":"cargo_manifest[0]: cargo cannot start at its own destination (0)"}}
+> {"command":"tick","parameters":{"cargo_manifest":[{"location":0,"destination":1,"quantity":0}]}}
+< {"status":"error","payload":{"message":"cargo_manifest[0].quantity must be a positive integer"}}
+> {"command":"tick","parameters":{"cargo_manifest":[{"location":0,"destination":1}]}}
+< {"status":"error","payload":{"message":"cargo_manifest[0] is missing \"quantity\""}}
+> {"command":"tick","parameters":{"cargo_manifest":[{"location":-1,"destination":1,"quantity":1}]}}
+< {"status":"error","payload":{"message":"cargo_manifest[0].location -1 is out of range (0 to 1)"}}
+> {"command":"tick","parameters":{"cargo_manifest":{"location":0,"destination":1,"quantity":1}}}
+< {"status":"error","payload":{"message":"cargo_manifest must be a list"}}
+> {"command":"tick","parameters":{"cargo_manifest":["oops"]}}
+< {"status":"error","payload":{"message":"cargo_manifest[0] must be an object"}}
+
+# still at tick 0
+> {"command":"get_state","parameters":{}}
+<~ {"payload":{"tick":0,"cargo":[]}}
+
+# empty, null and absent manifests are all fine
+> {"command":"tick","parameters":{"cargo_manifest":[]}}
+<~ {"payload":{"tick":1,"cargo":[]}}
+> {"command":"tick","parameters":{"cargo_manifest":null}}
+<~ {"payload":{"tick":2,"cargo":[]}}
+> {"command":"tick","parameters":{}}
+<~ {"payload":{"tick":3,"cargo":[]}}

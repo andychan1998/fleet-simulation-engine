@@ -1,0 +1,33 @@
+# Decision: dock throughput counts the net change from the committed state.
+# Per ship: max(units loaded, units unloaded), since one swap does one of each.
+# Moving cargo and moving it back costs nothing.
+
+> {"command":"init","parameters":{"travel_times":[[0,2,2],[2,0,2],[2,2,0]],"dock_throughput":[1,1,1],"vessels":[{"id":"v1","location":0}],"cargo_manifest":[{"location":0,"destination":1,"quantity":2},{"location":0,"destination":2,"quantity":1}]}}
+> {"command":"dock","parameters":{"vessel_id":"v1"}}
+> {"command":"tick","parameters":{}}
+
+# one load uses the whole budget of 1
+> {"command":"load","parameters":{"vessel_id":"v1","destination":1}}
+<~ {"status":"ok"}
+> {"command":"load","parameters":{"vessel_id":"v1","destination":1}}
+< {"status":"error","payload":{"message":"transfer of 2 operations exceeds dock throughput of 1 at location 0"}}
+
+# unloading the same unit cancels out: net change 0, so the budget is free again
+> {"command":"unload","parameters":{"vessel_id":"v1","destination":1}}
+< {"status":"ok","payload":{"tick":1,"vessels":{"v1":{"state":"docked","location":0,"cargo":[]}},"cargo":[{"location":0,"destination":1,"quantity":2},{"location":0,"destination":2,"quantity":1}]}}
+> {"command":"load","parameters":{"vessel_id":"v1","destination":1}}
+<~ {"status":"ok"}
+> {"command":"tick","parameters":{}}
+< {"status":"ok","payload":{"tick":2,"vessels":{"v1":{"state":"docked","location":0,"cargo":[{"destination":1,"quantity":1}]}},"cargo":[{"location":0,"destination":1,"quantity":1},{"location":0,"destination":2,"quantity":1}]}}
+
+# a swap is one operation: exchange the destination-1 unit for the destination-2 unit
+> {"command":"swap","parameters":{"vessel_id":"v1","load_destination":2,"unload_destination":1}}
+< {"status":"ok","payload":{"tick":2,"vessels":{"v1":{"state":"docked","location":0,"cargo":[{"destination":2,"quantity":1}]}},"cargo":[{"location":0,"destination":1,"quantity":2}]}}
+
+# loading a destination-1 unit back only undoes the swap's unload, so the net
+# change is still 1 operation (load the destination-2 unit); a second load
+# would need 2
+> {"command":"load","parameters":{"vessel_id":"v1","destination":1}}
+<~ {"status":"ok"}
+> {"command":"load","parameters":{"vessel_id":"v1","destination":1}}
+< {"status":"error","payload":{"message":"transfer of 2 operations exceeds dock throughput of 1 at location 0"}}

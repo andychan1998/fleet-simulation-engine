@@ -1,0 +1,31 @@
+# Decision: a command that reverses a pending change is allowed.
+# undock cancels a pending dock; dock cancels a pending undock (and cargo
+# commands already sent stay in place).
+
+> {"command":"init","parameters":{"travel_times":[[0,2],[2,0]],"dock_throughput":[2,2],"vessels":[{"id":"v1","location":0}],"cargo_manifest":[{"location":0,"destination":1,"quantity":2}]}}
+
+# undock cancels a pending dock
+> {"command":"dock","parameters":{"vessel_id":"v1"}}
+<~ {"payload":{"vessels":{"v1":{"state":"docked"}}}}
+> {"command":"undock","parameters":{"vessel_id":"v1"}}
+< {"status":"ok","payload":{"tick":0,"vessels":{"v1":{"state":"idle","location":0,"cargo":[]}},"cargo":[{"location":0,"destination":1,"quantity":2}]}}
+> {"command":"tick","parameters":{}}
+<~ {"payload":{"tick":1,"vessels":{"v1":{"state":"idle","location":0}}}}
+
+# dock cancels a pending undock; the load sent before the undock still happens
+> {"command":"dock","parameters":{"vessel_id":"v1"}}
+> {"command":"tick","parameters":{}}
+<~ {"payload":{"tick":2,"vessels":{"v1":{"state":"docked"}}}}
+> {"command":"load","parameters":{"vessel_id":"v1","destination":1}}
+> {"command":"undock","parameters":{"vessel_id":"v1"}}
+< {"status":"ok","payload":{"tick":2,"vessels":{"v1":{"state":"idle","location":0,"cargo":[{"destination":1,"quantity":1}]}},"cargo":[{"location":0,"destination":1,"quantity":1}]}}
+> {"command":"dock","parameters":{"vessel_id":"v1"}}
+< {"status":"ok","payload":{"tick":2,"vessels":{"v1":{"state":"docked","location":0,"cargo":[{"destination":1,"quantity":1}]}},"cargo":[{"location":0,"destination":1,"quantity":1}]}}
+> {"command":"tick","parameters":{}}
+< {"status":"ok","payload":{"tick":3,"vessels":{"v1":{"state":"docked","location":0,"cargo":[{"destination":1,"quantity":1}]}},"cargo":[{"location":0,"destination":1,"quantity":1}]}}
+
+# undock with nothing to cancel and no dock is an error
+> {"command":"undock","parameters":{"vessel_id":"v1"}}
+> {"command":"tick","parameters":{}}
+> {"command":"undock","parameters":{"vessel_id":"v1"}}
+< {"status":"error","payload":{"message":"vessel v1 is not docked"}}

@@ -1,0 +1,22 @@
+# Spec rule: a dock's throughput is shared by all ships docked there; each
+# dock has its own budget.
+
+> {"command":"init","parameters":{"travel_times":[[0,1],[1,0]],"dock_throughput":[2,1],"vessels":[{"id":"v1","location":0},{"id":"v2","location":0},{"id":"v3","location":1}],"cargo_manifest":[{"location":0,"destination":1,"quantity":3},{"location":1,"destination":0,"quantity":1}]}}
+> {"command":"dock","parameters":{"vessel_id":"v1"}}
+> {"command":"dock","parameters":{"vessel_id":"v2"}}
+> {"command":"dock","parameters":{"vessel_id":"v3"}}
+> {"command":"tick","parameters":{}}
+
+# dock 0: one load each uses the shared budget of 2
+> {"command":"load","parameters":{"vessel_id":"v1","destination":1}}
+<~ {"status":"ok"}
+> {"command":"load","parameters":{"vessel_id":"v2","destination":1}}
+<~ {"status":"ok"}
+> {"command":"load","parameters":{"vessel_id":"v1","destination":1}}
+< {"status":"error","payload":{"message":"transfer of 3 operations exceeds dock throughput of 2 at location 0"}}
+
+# dock 1 has its own budget
+> {"command":"load","parameters":{"vessel_id":"v3","destination":0}}
+<~ {"status":"ok"}
+> {"command":"tick","parameters":{}}
+< {"status":"ok","payload":{"tick":2,"vessels":{"v1":{"state":"docked","location":0,"cargo":[{"destination":1,"quantity":1}]},"v2":{"state":"docked","location":0,"cargo":[{"destination":1,"quantity":1}]},"v3":{"state":"docked","location":1,"cargo":[{"destination":0,"quantity":1}]}},"cargo":[{"location":0,"destination":1,"quantity":1}]}}

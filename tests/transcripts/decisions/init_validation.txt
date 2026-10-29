@@ -1,0 +1,64 @@
+# Decisions: init is fully validated before anything changes, so a failed
+# init doesn't count and can be retried. Every other command needs a
+# successful init first, and init can only succeed once.
+
+> {"command":"get_state","parameters":{}}
+< {"status":"error","payload":{"message":"simulation is not initialized: send init first"}}
+> {"command":"tick","parameters":{}}
+< {"status":"error","payload":{"message":"simulation is not initialized: send init first"}}
+
+# missing parameters
+> {"command":"init","parameters":{}}
+< {"status":"error","payload":{"message":"missing parameter \"travel_times\""}}
+> {"command":"init","parameters":{"travel_times":[[0,1],[1,0]],"vessels":[]}}
+< {"status":"error","payload":{"message":"missing parameter \"dock_throughput\""}}
+> {"command":"init","parameters":{"travel_times":[[0,1],[1,0]],"dock_throughput":[1,1]}}
+< {"status":"error","payload":{"message":"missing parameter \"vessels\""}}
+
+# travel_times
+> {"command":"init","parameters":{"travel_times":[],"dock_throughput":[],"vessels":[]}}
+< {"status":"error","payload":{"message":"travel_times must not be empty"}}
+> {"command":"init","parameters":{"travel_times":[[0,1],[1]],"dock_throughput":[1,1],"vessels":[]}}
+< {"status":"error","payload":{"message":"travel_times must be square: row 1 has 1 entries, expected 2"}}
+> {"command":"init","parameters":{"travel_times":[[1,1],[1,0]],"dock_throughput":[1,1],"vessels":[]}}
+< {"status":"error","payload":{"message":"travel_times[0][0] must be 0"}}
+> {"command":"init","parameters":{"travel_times":[[0,0],[1,0]],"dock_throughput":[1,1],"vessels":[]}}
+< {"status":"error","payload":{"message":"travel_times[0][1] must be a positive integer"}}
+> {"command":"init","parameters":{"travel_times":[[0,1.5],[1,0]],"dock_throughput":[1,1],"vessels":[]}}
+< {"status":"error","payload":{"message":"travel_times[0][1] must be a positive integer"}}
+> {"command":"init","parameters":{"travel_times":"[[0,1],[1,0]]","dock_throughput":[1,1],"vessels":[]}}
+< {"status":"error","payload":{"message":"travel_times must be a list"}}
+
+# dock_throughput
+> {"command":"init","parameters":{"travel_times":[[0,1],[1,0]],"dock_throughput":[1],"vessels":[]}}
+< {"status":"error","payload":{"message":"dock_throughput must have 2 entries (one per location), got 1"}}
+> {"command":"init","parameters":{"travel_times":[[0,1],[1,0]],"dock_throughput":[1,0],"vessels":[]}}
+< {"status":"error","payload":{"message":"dock_throughput[1] must be a positive integer"}}
+
+# vessels
+> {"command":"init","parameters":{"travel_times":[[0,1],[1,0]],"dock_throughput":[1,1],"vessels":[{"id":"v1","location":2}]}}
+< {"status":"error","payload":{"message":"vessels[0].location 2 is out of range (0 to 1)"}}
+> {"command":"init","parameters":{"travel_times":[[0,1],[1,0]],"dock_throughput":[1,1],"vessels":[{"id":"v1","location":0},{"id":"v1","location":1}]}}
+< {"status":"error","payload":{"message":"duplicate vessel id \"v1\""}}
+> {"command":"init","parameters":{"travel_times":[[0,1],[1,0]],"dock_throughput":[1,1],"vessels":[{"id":"","location":0}]}}
+< {"status":"error","payload":{"message":"vessels[0].id must be a non-empty string"}}
+> {"command":"init","parameters":{"travel_times":[[0,1],[1,0]],"dock_throughput":[1,1],"vessels":[{"id":7,"location":0}]}}
+< {"status":"error","payload":{"message":"vessels[0].id must be a non-empty string"}}
+> {"command":"init","parameters":{"travel_times":[[0,1],[1,0]],"dock_throughput":[1,1],"vessels":[{"location":0}]}}
+< {"status":"error","payload":{"message":"vessels[0] is missing \"id\""}}
+> {"command":"init","parameters":{"travel_times":[[0,1],[1,0]],"dock_throughput":[1,1],"vessels":[{"id":"v1","location":true}]}}
+< {"status":"error","payload":{"message":"vessels[0].location must be an integer"}}
+
+# cargo_manifest
+> {"command":"init","parameters":{"travel_times":[[0,1],[1,0]],"dock_throughput":[1,1],"vessels":[],"cargo_manifest":[{"location":1,"destination":1,"quantity":1}]}}
+< {"status":"error","payload":{"message":"cargo_manifest[0]: cargo cannot start at its own destination (1)"}}
+
+# none of the failures above counted: init still works
+> {"command":"get_state","parameters":{}}
+< {"status":"error","payload":{"message":"simulation is not initialized: send init first"}}
+> {"command":"init","parameters":{"travel_times":[[0]],"dock_throughput":[1],"vessels":[{"id":"only","location":0}]}}
+< {"status":"ok","payload":{"tick":0,"vessels":{"only":{"state":"idle","location":0,"cargo":[]}},"cargo":[]}}
+
+# but only once
+> {"command":"init","parameters":{"travel_times":[[0]],"dock_throughput":[1],"vessels":[]}}
+< {"status":"error","payload":{"message":"simulation is already initialized"}}

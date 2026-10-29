@@ -1,0 +1,30 @@
+# Spec rules: cargo commands need the ship docked and the cargo to exist.
+
+> {"command":"init","parameters":{"travel_times":[[0,2,2],[2,0,2],[2,2,0]],"dock_throughput":[2,2,2],"vessels":[{"id":"v1","location":0},{"id":"v2","location":1}],"cargo_manifest":[{"location":0,"destination":1,"quantity":1}]}}
+
+# a ship in transit can't do cargo work
+> {"command":"set_destination","parameters":{"vessel_id":"v2","destination":0}}
+> {"command":"dock","parameters":{"vessel_id":"v1"}}
+> {"command":"tick","parameters":{}}
+> {"command":"load","parameters":{"vessel_id":"v2","destination":1}}
+< {"status":"error","payload":{"message":"vessel v2 is not docked"}}
+
+# a pending dock isn't enough: the dock has to be committed by a tick first
+> {"command":"undock","parameters":{"vessel_id":"v1"}}
+> {"command":"tick","parameters":{}}
+> {"command":"dock","parameters":{"vessel_id":"v1"}}
+> {"command":"load","parameters":{"vessel_id":"v1","destination":1}}
+< {"status":"error","payload":{"message":"vessel v1 is not docked"}}
+> {"command":"tick","parameters":{}}
+
+# cargo that isn't there
+> {"command":"load","parameters":{"vessel_id":"v1","destination":2}}
+< {"status":"error","payload":{"message":"no cargo for destination 2 at location 0"}}
+> {"command":"unload","parameters":{"vessel_id":"v1","destination":1}}
+< {"status":"error","payload":{"message":"vessel v1 has no cargo for destination 1"}}
+
+# a unit can only be loaded once
+> {"command":"load","parameters":{"vessel_id":"v1","destination":1}}
+<~ {"status":"ok"}
+> {"command":"load","parameters":{"vessel_id":"v1","destination":1}}
+< {"status":"error","payload":{"message":"no cargo for destination 1 at location 0"}}

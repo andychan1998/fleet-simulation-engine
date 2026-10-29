@@ -1,0 +1,20 @@
+# Decision: a ship can load cargo that another ship unloaded at the same dock
+# earlier in the same tick. Availability is checked against the planned state.
+# (rules/throughput_shared_dock.txt covers ships sharing a dock's budget.)
+
+> {"command":"init","parameters":{"travel_times":[[0,2,2],[2,0,2],[2,2,0]],"dock_throughput":[2,2,2],"vessels":[{"id":"v1","location":0},{"id":"v2","location":0}],"cargo_manifest":[{"location":0,"destination":2,"quantity":1}]}}
+> {"command":"dock","parameters":{"vessel_id":"v1"}}
+> {"command":"dock","parameters":{"vessel_id":"v2"}}
+> {"command":"tick","parameters":{}}
+> {"command":"load","parameters":{"vessel_id":"v1","destination":2}}
+> {"command":"tick","parameters":{}}
+< {"status":"ok","payload":{"tick":2,"vessels":{"v1":{"state":"docked","location":0,"cargo":[{"destination":2,"quantity":1}]},"v2":{"state":"docked","location":0,"cargo":[]}},"cargo":[]}}
+
+# v1 hands its unit to v2 through the dock: 1 unload + 1 load = 2 operations
+> {"command":"unload","parameters":{"vessel_id":"v1","destination":2}}
+< {"status":"ok","payload":{"tick":2,"vessels":{"v1":{"state":"docked","location":0,"cargo":[]},"v2":{"state":"docked","location":0,"cargo":[]}},"cargo":[{"location":0,"destination":2,"quantity":1}]}}
+> {"command":"load","parameters":{"vessel_id":"v2","destination":2}}
+< {"status":"ok","payload":{"tick":2,"vessels":{"v1":{"state":"docked","location":0,"cargo":[]},"v2":{"state":"docked","location":0,"cargo":[{"destination":2,"quantity":1}]}},"cargo":[]}}
+
+> {"command":"tick","parameters":{}}
+< {"status":"ok","payload":{"tick":3,"vessels":{"v1":{"state":"docked","location":0,"cargo":[]},"v2":{"state":"docked","location":0,"cargo":[{"destination":2,"quantity":1}]}},"cargo":[]}}

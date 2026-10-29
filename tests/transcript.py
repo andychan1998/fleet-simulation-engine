@@ -5,9 +5,13 @@ File format (one item per line):
     # comment            ignored
     > {json command}     sent to the engine
     < {json response}    expected response to the command just above (optional)
+    <~ {json}            partial match: only the keys given are checked
 
 Blank lines are ignored. Responses are compared as parsed JSON, so spacing and
-key order don't matter (list order does).
+key order don't matter (list order does). With `<~`, objects are matched key by
+key and everything else (lists included) must be equal, e.g.
+
+    <~ {"payload": {"vessels": {"v1": {"state": "docked"}}}}
 
 To add a test, drop a new .txt file anywhere under tests/transcripts/.
 """
@@ -35,6 +39,7 @@ class Step:
     command: str
     expected: dict | None = None
     expected_line_no: int | None = None
+    partial: bool = False
 
 
 def parse_transcript(path: Path) -> list[Step]:
@@ -48,25 +53,38 @@ def parse_transcript(path: Path) -> list[Step]:
         elif line.startswith("<"):
             if not steps or steps[-1].expected is not None:
                 raise ValueError(f"{path.name}:{line_no}: '<' line without a command before it")
+            partial = line.startswith("<~")
             try:
-                steps[-1].expected = json.loads(line[1:])
+                steps[-1].expected = json.loads(line[2:] if partial else line[1:])
             except json.JSONDecodeError as exc:
                 raise ValueError(f"{path.name}:{line_no}: bad JSON in expected response: {exc}") from None
             steps[-1].expected_line_no = line_no
+            steps[-1].partial = partial
         else:
             raise ValueError(f"{path.name}:{line_no}: line must start with '>', '<' or '#'")
     return steps
+
+
+def matches(got, expected, partial: bool) -> bool:
+    if not partial:
+        return got == expected
+    if isinstance(expected, dict):
+        return isinstance(got, dict) and all(
+            key in got and matches(got[key], value, partial) for key, value in expected.items()
+        )
+    return got == expected
 
 
 def check_transcript(test: unittest.TestCase, path: Path) -> None:
     sim = Simulation()
     for step in parse_transcript(path):
         got = process_line(sim, step.command)
-        if step.expected is not None and got != step.expected:
+        if step.expected is not None and not matches(got, step.expected, step.partial):
+            kind = "expected (partial)" if step.partial else "expected"
             test.fail(
                 f"\n{path.relative_to(TRANSCRIPT_DIR)}:{step.expected_line_no}\n"
                 f"  command:  {step.command}\n"
-                f"  expected: {json.dumps(step.expected)}\n"
+                f"  {kind}: {json.dumps(step.expected)}\n"
                 f"  got:      {json.dumps(got)}"
             )
 

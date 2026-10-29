@@ -1,0 +1,24 @@
+# Decision: set_destination to the ship's current port leaves it idle there,
+# cancelling whatever was pending (a trip or a dock).
+
+> {"command":"init","parameters":{"travel_times":[[0,2],[2,0]],"dock_throughput":[1,1],"vessels":[{"id":"v1","location":0}]}}
+
+# nothing pending: nothing changes
+> {"command":"set_destination","parameters":{"vessel_id":"v1","destination":0}}
+< {"status":"ok","payload":{"tick":0,"vessels":{"v1":{"state":"idle","location":0,"cargo":[]}},"cargo":[]}}
+
+# cancels a pending trip
+> {"command":"set_destination","parameters":{"vessel_id":"v1","destination":1}}
+<~ {"payload":{"vessels":{"v1":{"state":"transit","to":1}}}}
+> {"command":"set_destination","parameters":{"vessel_id":"v1","destination":0}}
+< {"status":"ok","payload":{"tick":0,"vessels":{"v1":{"state":"idle","location":0,"cargo":[]}},"cargo":[]}}
+> {"command":"tick","parameters":{}}
+< {"status":"ok","payload":{"tick":1,"vessels":{"v1":{"state":"idle","location":0,"cargo":[]}},"cargo":[]}}
+
+# cancels a pending dock
+> {"command":"dock","parameters":{"vessel_id":"v1"}}
+<~ {"payload":{"vessels":{"v1":{"state":"docked","location":0}}}}
+> {"command":"set_destination","parameters":{"vessel_id":"v1","destination":0}}
+< {"status":"ok","payload":{"tick":1,"vessels":{"v1":{"state":"idle","location":0,"cargo":[]}},"cargo":[]}}
+> {"command":"tick","parameters":{}}
+< {"status":"ok","payload":{"tick":2,"vessels":{"v1":{"state":"idle","location":0,"cargo":[]}},"cargo":[]}}

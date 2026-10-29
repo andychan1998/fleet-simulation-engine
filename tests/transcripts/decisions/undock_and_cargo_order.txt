@@ -1,0 +1,30 @@
+# Decision: cargo commands before an undock are fine (the cargo moves and the
+# ship leaves at the next tick). Cargo commands after an undock are rejected
+# until a dock cancels the undock.
+
+> {"command":"init","parameters":{"travel_times":[[0,2],[2,0]],"dock_throughput":[3,3],"vessels":[{"id":"v1","location":0}],"cargo_manifest":[{"location":0,"destination":1,"quantity":3}]}}
+> {"command":"dock","parameters":{"vessel_id":"v1"}}
+> {"command":"tick","parameters":{}}
+
+# load, then undock: both happen at the tick
+> {"command":"load","parameters":{"vessel_id":"v1","destination":1}}
+> {"command":"undock","parameters":{"vessel_id":"v1"}}
+< {"status":"ok","payload":{"tick":1,"vessels":{"v1":{"state":"idle","location":0,"cargo":[{"destination":1,"quantity":1}]}},"cargo":[{"location":0,"destination":1,"quantity":2}]}}
+
+# after the undock, cargo commands are rejected
+> {"command":"load","parameters":{"vessel_id":"v1","destination":1}}
+< {"status":"error","payload":{"message":"vessel v1 is undocking"}}
+> {"command":"unload","parameters":{"vessel_id":"v1","destination":1}}
+< {"status":"error","payload":{"message":"vessel v1 is undocking"}}
+> {"command":"swap","parameters":{"vessel_id":"v1","load_destination":1,"unload_destination":1}}
+< {"status":"error","payload":{"message":"vessel v1 is undocking"}}
+
+# dock cancels the undock, and cargo commands work again
+> {"command":"dock","parameters":{"vessel_id":"v1"}}
+> {"command":"load","parameters":{"vessel_id":"v1","destination":1}}
+< {"status":"ok","payload":{"tick":1,"vessels":{"v1":{"state":"docked","location":0,"cargo":[{"destination":1,"quantity":2}]}},"cargo":[{"location":0,"destination":1,"quantity":1}]}}
+
+# undock again; the tick applies the loads and the undock together
+> {"command":"undock","parameters":{"vessel_id":"v1"}}
+> {"command":"tick","parameters":{}}
+< {"status":"ok","payload":{"tick":2,"vessels":{"v1":{"state":"idle","location":0,"cargo":[{"destination":1,"quantity":2}]}},"cargo":[{"location":0,"destination":1,"quantity":1}]}}

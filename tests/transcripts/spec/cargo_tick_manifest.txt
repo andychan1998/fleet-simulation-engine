@@ -1,0 +1,6 @@
+# Follow-on 1: the spec's tick example. Cargo in a tick's manifest lands on the
+# docks in the newly committed state.
+
+> {"command":"init","parameters":{"travel_times":[[0,4,7],[4,0,3],[7,3,0]],"dock_throughput":[2,4,1],"vessels":[{"id":"v1","location":0},{"id":"v2","location":2}]}}
+> {"command":"tick","parameters":{"cargo_manifest":[{"location":0,"destination":2,"quantity":1},{"location":0,"destination":1,"quantity":1},{"location":2,"destination":0,"quantity":1}]}}
+< {"status":"ok","payload":{"tick":1,"vessels":{"v1":{"state":"idle","location":0,"cargo":[]},"v2":{"state":"idle","location":2,"cargo":[]}},"cargo":[{"location":0,"destination":2,"quantity":1},{"location":0,"destination":1,"quantity":1},{"location":2,"destination":0,"quantity":1}]}}

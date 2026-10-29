@@ -105,3 +105,37 @@ def parse_vessels(value, num_locations: int) -> dict[str, Vessel]:
         location = check_index(get(item, "location", label), f"{label}.location", num_locations)
         vessels[vessel_id] = Vessel.idle_at(location)
     return vessels
+
+
+def parse_dock_throughput(value, num_locations: int) -> list[int]:
+    """One positive integer per location: max cargo operations at that dock per tick."""
+    limits = check_list(value, "dock_throughput")
+    if len(limits) != num_locations:
+        raise CommandError(
+            f"dock_throughput must have {num_locations} entries (one per location), got {len(limits)}"
+        )
+    for i, limit in enumerate(limits):
+        check_positive_int(limit, f"dock_throughput[{i}]")
+    return list(limits)
+
+
+def parse_manifest(value, num_locations: int) -> list[tuple[int, int, int]]:
+    """Optional list of {location, destination, quantity}: new cargo arriving at docks.
+
+    Returns (location, destination, quantity) tuples. Any bad entry rejects the
+    whole manifest, and with it the whole command.
+    """
+    if value is None:
+        return []
+    entries = check_list(value, "cargo_manifest")
+    manifest = []
+    for k, entry in enumerate(entries):
+        label = f"cargo_manifest[{k}]"
+        check_object(entry, label)
+        location = check_index(get(entry, "location", label), f"{label}.location", num_locations)
+        destination = check_index(get(entry, "destination", label), f"{label}.destination", num_locations)
+        quantity = check_positive_int(get(entry, "quantity", label), f"{label}.quantity")
+        if location == destination:
+            raise CommandError(f"{label}: cargo cannot start at its own destination ({location})")
+        manifest.append((location, destination, quantity))
+    return manifest

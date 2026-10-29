@@ -1,0 +1,17 @@
+# Follow-on 1: the spec's throughput error. Dock 0 allows 2 operations per
+# tick, so the third load before the next tick is rejected.
+
+> {"command":"init","parameters":{"travel_times":[[0,4,7],[4,0,3],[7,3,0]],"dock_throughput":[2,4,1],"vessels":[{"id":"v1","location":0},{"id":"v2","location":2}],"cargo_manifest":[{"location":0,"destination":1,"quantity":3}]}}
+> {"command":"dock","parameters":{"vessel_id":"v1"}}
+> {"command":"tick","parameters":{}}
+> {"command":"load","parameters":{"vessel_id":"v1","destination":1}}
+< {"status":"ok","payload":{"tick":1,"vessels":{"v1":{"state":"docked","location":0,"cargo":[{"destination":1,"quantity":1}]},"v2":{"state":"idle","location":2,"cargo":[]}},"cargo":[{"location":0,"destination":1,"quantity":2}]}}
+> {"command":"load","parameters":{"vessel_id":"v1","destination":1}}
+< {"status":"ok","payload":{"tick":1,"vessels":{"v1":{"state":"docked","location":0,"cargo":[{"destination":1,"quantity":2}]},"v2":{"state":"idle","location":2,"cargo":[]}},"cargo":[{"location":0,"destination":1,"quantity":1}]}}
+> {"command":"load","parameters":{"vessel_id":"v1","destination":1}}
+< {"status":"error","payload":{"message":"transfer of 3 operations exceeds dock throughput of 2 at location 0"}}
+
+# after the next tick the dock's budget starts over
+> {"command":"tick","parameters":{}}
+> {"command":"load","parameters":{"vessel_id":"v1","destination":1}}
+< {"status":"ok","payload":{"tick":2,"vessels":{"v1":{"state":"docked","location":0,"cargo":[{"destination":1,"quantity":3}]},"v2":{"state":"idle","location":2,"cargo":[]}},"cargo":[]}}

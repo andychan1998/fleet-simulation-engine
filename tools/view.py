@@ -156,7 +156,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     style = Style(sys.stdout.isatty() and not args.no_color and "NO_COLOR" not in os.environ)
-    lines = args.scenario.read_text(encoding="utf-8").splitlines()
+    try:
+        lines = args.scenario.read_text(encoding="utf-8-sig", errors="replace").splitlines()
+    except OSError as exc:
+        print(f"view.py: cannot open {args.scenario}: {exc.strerror}", file=sys.stderr)
+        return 2
     responses = iter(run_engine(args.scenario))
     step = args.step and sys.stdin.isatty()
 

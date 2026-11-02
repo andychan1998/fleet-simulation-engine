@@ -1,0 +1,21 @@
+# Spec rule: a dock's throughput counts every operation at that dock since the
+# last tick, including those by a ship that has since been told to undock
+# (its load still happens at the tick).
+
+> {"command":"init","parameters":{"travel_times":[[0,1],[1,0]],"dock_throughput":[2,1],"vessels":[{"id":"a","location":0},{"id":"b","location":0}],"cargo_manifest":[{"location":0,"destination":1,"quantity":3}]}}
+> {"command":"dock","parameters":{"vessel_id":"a"}}
+> {"command":"dock","parameters":{"vessel_id":"b"}}
+> {"command":"tick","parameters":{}}
+
+> {"command":"load","parameters":{"vessel_id":"a","destination":1}}
+<~ {"status":"ok"}
+> {"command":"undock","parameters":{"vessel_id":"a"}}
+<~ {"status":"ok","payload":{"vessels":{"a":{"state":"idle","cargo":[{"destination":1,"quantity":1}]}}}}
+> {"command":"load","parameters":{"vessel_id":"b","destination":1}}
+<~ {"status":"ok"}
+# a's load still counts: this would be the third operation at dock 0
+> {"command":"load","parameters":{"vessel_id":"b","destination":1}}
+< {"status":"error","payload":{"message":"transfer of 3 operations exceeds dock throughput of 2 at location 0"}}
+
+> {"command":"tick","parameters":{}}
+< {"status":"ok","payload":{"tick":2,"vessels":{"a":{"state":"idle","location":0,"cargo":[{"destination":1,"quantity":1}]},"b":{"state":"docked","location":0,"cargo":[{"destination":1,"quantity":1}]}},"cargo":[{"location":0,"destination":1,"quantity":1}]}}

@@ -28,14 +28,22 @@
 < {"status":"error","payload":{"message":"travel_times[0][1] must be a positive integer"}}
 > {"command":"init","parameters":{"travel_times":"[[0,1],[1,0]]","dock_throughput":[1,1],"vessels":[]}}
 < {"status":"error","payload":{"message":"travel_times must be a list"}}
+> {"command":"init","parameters":{"travel_times":[[0,1],5],"dock_throughput":[1,1],"vessels":[]}}
+< {"status":"error","payload":{"message":"travel_times[1] must be a list"}}
 
 # dock_throughput
 > {"command":"init","parameters":{"travel_times":[[0,1],[1,0]],"dock_throughput":[1],"vessels":[]}}
 < {"status":"error","payload":{"message":"dock_throughput must have 2 entries (one per location), got 1"}}
 > {"command":"init","parameters":{"travel_times":[[0,1],[1,0]],"dock_throughput":[1,0],"vessels":[]}}
 < {"status":"error","payload":{"message":"dock_throughput[1] must be a positive integer"}}
+> {"command":"init","parameters":{"travel_times":[[0,1],[1,0]],"dock_throughput":3,"vessels":[]}}
+< {"status":"error","payload":{"message":"dock_throughput must be a list"}}
 
 # vessels
+> {"command":"init","parameters":{"travel_times":[[0,1],[1,0]],"dock_throughput":[1,1],"vessels":{"id":"v1","location":0}}}
+< {"status":"error","payload":{"message":"vessels must be a list"}}
+> {"command":"init","parameters":{"travel_times":[[0,1],[1,0]],"dock_throughput":[1,1],"vessels":["v1"]}}
+< {"status":"error","payload":{"message":"vessels[0] must be an object"}}
 > {"command":"init","parameters":{"travel_times":[[0,1],[1,0]],"dock_throughput":[1,1],"vessels":[{"id":"v1","location":2}]}}
 < {"status":"error","payload":{"message":"vessels[0].location 2 is out of range (0 to 1)"}}
 > {"command":"init","parameters":{"travel_times":[[0,1],[1,0]],"dock_throughput":[1,1],"vessels":[{"id":"v1","location":0},{"id":"v1","location":1}]}}

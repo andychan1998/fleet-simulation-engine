@@ -1,0 +1,61 @@
+# Decisions: a swap succeeds only if both halves can; if either fails, nothing
+# changes. Swapping a destination for itself is always accepted and changes
+# nothing at all, at any port and whatever cargo there is (not even the order
+# the ship's cargo is listed in).
+
+> {"command":"init","parameters":{"travel_times":[[0,2,2],[2,0,2],[2,2,0]],"dock_throughput":[2,2,2],"vessels":[{"id":"v1","location":0}],"cargo_manifest":[{"location":0,"destination":1,"quantity":1},{"location":0,"destination":2,"quantity":1}]}}
+> {"command":"dock","parameters":{"vessel_id":"v1"}}
+> {"command":"tick","parameters":{}}
+> {"command":"load","parameters":{"vessel_id":"v1","destination":1}}
+> {"command":"load","parameters":{"vessel_id":"v1","destination":2}}
+> {"command":"tick","parameters":{}}
+< {"status":"ok","payload":{"tick":2,"vessels":{"v1":{"state":"docked","location":0,"cargo":[{"destination":1,"quantity":1},{"destination":2,"quantity":1}]}},"cargo":[]}}
+
+# same destination both ways: accepted, nothing changes (destination 1 stays
+# listed first), even though dock 0 has no destination-1 cargo of its own
+> {"command":"swap","parameters":{"vessel_id":"v1","load_destination":1,"unload_destination":1}}
+< {"status":"ok","payload":{"tick":2,"vessels":{"v1":{"state":"docked","location":0,"cargo":[{"destination":1,"quantity":1},{"destination":2,"quantity":1}]}},"cargo":[]}}
+# also when neither the ship nor the dock has any cargo for that destination
+> {"command":"swap","parameters":{"vessel_id":"v1","load_destination":0,"unload_destination":0}}
+< {"status":"ok","payload":{"tick":2,"vessels":{"v1":{"state":"docked","location":0,"cargo":[{"destination":1,"quantity":1},{"destination":2,"quantity":1}]}},"cargo":[]}}
+# the usual checks still apply: an unknown ship, a ship that isn't docked, or a
+# bad port number is rejected
+> {"command":"swap","parameters":{"vessel_id":"v9","load_destination":1,"unload_destination":1}}
+< {"status":"error","payload":{"message":"unknown vessel v9"}}
+> {"command":"swap","parameters":{"vessel_id":"v1","load_destination":3,"unload_destination":3}}
+<~ {"status":"error"}
+
+# the unload half would work, but there's nothing for destination 2 to load
+> {"command":"swap","parameters":{"vessel_id":"v1","load_destination":2,"unload_destination":1}}
+< {"status":"error","payload":{"message":"no cargo for destination 2 at location 0"}}
+# the ship has nothing for destination 0 to unload
+> {"command":"swap","parameters":{"vessel_id":"v1","load_destination":1,"unload_destination":0}}
+< {"status":"error","payload":{"message":"vessel v1 has no cargo for destination 0"}}
+# none of the swaps changed anything, and none used the dock's throughput:
+# both units can still be unloaded (2 operations, the limit at dock 0)
+> {"command":"get_state","parameters":{}}
+< {"status":"ok","payload":{"tick":2,"vessels":{"v1":{"state":"docked","location":0,"cargo":[{"destination":1,"quantity":1},{"destination":2,"quantity":1}]}},"cargo":[]}}
+> {"command":"unload","parameters":{"vessel_id":"v1","destination":1}}
+> {"command":"unload","parameters":{"vessel_id":"v1","destination":2}}
+<~ {"status":"ok"}
+> {"command":"load","parameters":{"vessel_id":"v1","destination":1}}
+> {"command":"load","parameters":{"vessel_id":"v1","destination":2}}
+<~ {"status":"ok"}
+
+# sail to location 1 and dock there
+> {"command":"undock","parameters":{"vessel_id":"v1"}}
+> {"command":"tick","parameters":{}}
+> {"command":"set_destination","parameters":{"vessel_id":"v1","destination":1}}
+> {"command":"tick","parameters":{}}
+> {"command":"tick","parameters":{}}
+> {"command":"dock","parameters":{"vessel_id":"v1"}}
+> {"command":"tick","parameters":{}}
+< {"status":"ok","payload":{"tick":6,"vessels":{"v1":{"state":"docked","location":1,"cargo":[{"destination":1,"quantity":1},{"destination":2,"quantity":1}]}},"cargo":[]}}
+
+# at the cargo's own destination too: nothing is delivered, nothing changes
+> {"command":"swap","parameters":{"vessel_id":"v1","load_destination":1,"unload_destination":1}}
+< {"status":"ok","payload":{"tick":6,"vessels":{"v1":{"state":"docked","location":1,"cargo":[{"destination":1,"quantity":1},{"destination":2,"quantity":1}]}},"cargo":[]}}
+# and a ship about to undock can't swap
+> {"command":"undock","parameters":{"vessel_id":"v1"}}
+> {"command":"swap","parameters":{"vessel_id":"v1","load_destination":1,"unload_destination":1}}
+< {"status":"error","payload":{"message":"vessel v1 is undocking"}}

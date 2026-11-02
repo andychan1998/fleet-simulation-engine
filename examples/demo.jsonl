@@ -4,7 +4,7 @@
 # Port 0 starts with 2 units bound for port 2 and 1 bound for port 1.
 {"command":"init","parameters":{"travel_times":[[0,2,3],[2,0,2],[3,2,0]],"dock_throughput":[2,1,2],"vessels":[{"id":"alpha","location":0},{"id":"bravo","location":1}],"cargo_manifest":[{"location":0,"destination":2,"quantity":2},{"location":0,"destination":1,"quantity":1}]}}
 
-# 1. Planned vs committed: orders can change freely until the next tick.
+# 1. Planned vs committed: until the next tick, a newer order replaces an earlier one.
 {"command":"set_destination","parameters":{"vessel_id":"bravo","destination":0}}
 {"command":"set_destination","parameters":{"vessel_id":"bravo","destination":2}}
 {"command":"dock","parameters":{"vessel_id":"alpha"}}

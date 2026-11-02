@@ -1,0 +1,11 @@
+# Ship ids are any non-empty strings, matched exactly: case, spaces and
+# non-English characters all count.
+
+> {"command":"init","parameters":{"travel_times":[[0,1],[1,0]],"dock_throughput":[1,1],"vessels":[{"id":"v1","location":0},{"id":"V1","location":1},{"id":"ship two","location":0},{"id":"船","location":1}]}}
+> {"command":"set_destination","parameters":{"vessel_id":"V1","destination":0}}
+> {"command":"dock","parameters":{"vessel_id":"船"}}
+> {"command":"dock","parameters":{"vessel_id":"ship two"}}
+> {"command":"get_state","parameters":{}}
+< {"status":"ok","payload":{"tick":0,"vessels":{"v1":{"state":"idle","location":0,"cargo":[]},"V1":{"state":"transit","from":1,"to":0,"arrives_at_tick":1,"cargo":[]},"ship two":{"state":"docked","location":0,"cargo":[]},"船":{"state":"docked","location":1,"cargo":[]}},"cargo":[]}}
+> {"command":"dock","parameters":{"vessel_id":"ship  two"}}
+< {"status":"error","payload":{"message":"unknown vessel ship  two"}}

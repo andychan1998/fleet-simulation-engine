@@ -1,0 +1,11 @@
+# Edge case: a simulation with no ships still runs: ticks advance, cargo
+# arrives on the docks, and history works.
+
+> {"command":"init","parameters":{"travel_times":[[0,1],[1,0]],"dock_throughput":[1,1],"vessels":[],"cargo_manifest":[{"location":0,"destination":1,"quantity":2}]}}
+< {"status":"ok","payload":{"tick":0,"vessels":{},"cargo":[{"location":0,"destination":1,"quantity":2}]}}
+> {"command":"tick","parameters":{"cargo_manifest":[{"location":1,"destination":0,"quantity":1}]}}
+< {"status":"ok","payload":{"tick":1,"vessels":{},"cargo":[{"location":0,"destination":1,"quantity":2},{"location":1,"destination":0,"quantity":1}]}}
+> {"command":"get_state_at","parameters":{"tick":0}}
+< {"status":"ok","payload":{"tick":0,"vessels":{},"cargo":[{"location":0,"destination":1,"quantity":2}]}}
+> {"command":"dock","parameters":{"vessel_id":"v1"}}
+< {"status":"error","payload":{"message":"unknown vessel v1"}}

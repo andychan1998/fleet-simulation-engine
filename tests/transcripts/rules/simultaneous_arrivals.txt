@@ -1,0 +1,21 @@
+# Spec rules: every ship due on a tick arrives on that tick. Ships arriving at
+# the same port don't affect each other, a ship can arrive where another just
+# left, and all of them can be commanded right away.
+
+> {"command":"init","parameters":{"travel_times":[[0,2,2],[2,0,2],[2,2,0]],"dock_throughput":[1,1,1],"vessels":[{"id":"a","location":0},{"id":"b","location":2},{"id":"c","location":1}]}}
+> {"command":"set_destination","parameters":{"vessel_id":"a","destination":1}}
+> {"command":"set_destination","parameters":{"vessel_id":"b","destination":1}}
+> {"command":"set_destination","parameters":{"vessel_id":"c","destination":0}}
+> {"command":"tick","parameters":{}}
+< {"status":"ok","payload":{"tick":1,"vessels":{"a":{"state":"transit","from":0,"to":1,"arrives_at_tick":2,"cargo":[]},"b":{"state":"transit","from":2,"to":1,"arrives_at_tick":2,"cargo":[]},"c":{"state":"transit","from":1,"to":0,"arrives_at_tick":2,"cargo":[]}},"cargo":[]}}
+
+# all three arrive together: a and b at port 1, c at port 0 (which a left)
+> {"command":"tick","parameters":{}}
+< {"status":"ok","payload":{"tick":2,"vessels":{"a":{"state":"idle","location":1,"cargo":[]},"b":{"state":"idle","location":1,"cargo":[]},"c":{"state":"idle","location":0,"cargo":[]}},"cargo":[]}}
+
+# commanded right away; two ships can dock at the same port
+> {"command":"dock","parameters":{"vessel_id":"a"}}
+> {"command":"dock","parameters":{"vessel_id":"b"}}
+> {"command":"set_destination","parameters":{"vessel_id":"c","destination":2}}
+> {"command":"tick","parameters":{}}
+< {"status":"ok","payload":{"tick":3,"vessels":{"a":{"state":"docked","location":1,"cargo":[]},"b":{"state":"docked","location":1,"cargo":[]},"c":{"state":"transit","from":0,"to":2,"arrives_at_tick":4,"cargo":[]}},"cargo":[]}}

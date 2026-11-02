@@ -197,8 +197,13 @@ class Simulation:
         unload_destination = check_index(get(params, "unload_destination"), "unload_destination", n)
         self._require_docked(vessel_id)
 
+        if load_destination == unload_destination:
+            # Swapping a destination for itself always changes nothing, whatever cargo
+            # the ship or dock has (not even the order the ship's cargo is listed in).
+            return self.planned.to_payload()
+
         world = self.planned.clone()
-        # Unload first, then load: the swap is valid if both succeed in that order.
+        # Both halves must succeed. With different destinations, their order doesn't matter.
         _move_vessel_to_dock(world, vessel_id, unload_destination)
         _move_dock_to_vessel(world, vessel_id, load_destination)
         return self._apply_cargo_change(world, vessel_id)

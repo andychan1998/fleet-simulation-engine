@@ -13,6 +13,17 @@
 < {"status":"error","payload":{"message":"unknown command: fly"}}
 > {"command":"init","parameters":[1]}
 < {"status":"error","payload":{"message":"\"parameters\" must be a JSON object"}}
+> {"command":"init","parameters":null}
+< {"status":"error","payload":{"message":"\"parameters\" must be a JSON object"}}
+# command names are case-sensitive
+> {"command":"TICK","parameters":{}}
+< {"status":"error","payload":{"message":"unknown command: TICK"}}
+> {}
+< {"status":"error","payload":{"message":"request must have a \"command\" string"}}
+> {"command":null}
+< {"status":"error","payload":{"message":"request must have a \"command\" string"}}
+> {"command":"get_state"} {"command":"tick"}
+< {"status":"error","payload":{"message":"invalid JSON: Extra data"}}
 
 > {"command":"init","parameters":{"travel_times":[[0,1],[1,0]],"dock_throughput":[1,1],"vessels":[{"id":"v1","location":0}]}}
 
@@ -51,3 +62,7 @@
 # none of that changed anything
 > {"command":"get_state","parameters":{}}
 < {"status":"ok","payload":{"tick":0,"vessels":{"v1":{"state":"idle","location":0,"cargo":[]}},"cargo":[]}}
+
+# unknown extra parameters are ignored
+> {"command":"set_destination","parameters":{"vessel_id":"v1","destination":1,"speed":"fast"}}
+<~ {"status":"ok","payload":{"vessels":{"v1":{"state":"transit","to":1}}}}

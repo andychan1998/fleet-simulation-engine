@@ -100,7 +100,7 @@ def random_command(rng: random.Random, sim: Simulation) -> dict | str:
     vessel_id = rng.choice(list(sim.committed.vessels))
     vessel = sim.planned.vessels[vessel_id]
     here = vessel.location if vessel.location is not None else 0
-    on_dock = [d for (loc, d) in sim.planned.dock_cargo if loc == here] or [rng.randrange(n)]
+    on_dock = list(sim.planned.docks.get(here, {})) or [rng.randrange(n)]
     on_ship = list(vessel.cargo) or [rng.randrange(n)]
     return rng.choice([
         cmd("set_destination", vessel_id=vessel_id, destination=rng.randrange(n)),
@@ -126,7 +126,7 @@ def snapshot(sim: Simulation) -> tuple:
 
 
 def total_units(world) -> int:
-    on_docks = sum(world.dock_cargo.values())
+    on_docks = sum(q for _, _, q in world.cargo_entries())
     on_ships = sum(sum(v.cargo.values()) for v in world.vessels.values())
     return on_docks + on_ships + world.delivered
 
@@ -242,7 +242,7 @@ class Scenario:
 
         for world, name in ((committed, "committed"), (planned, "planned")):
             self.check(total_units(world) == self.units_added, f"cargo not conserved in {name} state")
-            for (loc, dest), qty in world.dock_cargo.items():
+            for loc, dest, qty in world.cargo_entries():
                 self.check(qty > 0, f"{name}: dock entry with quantity {qty}")
                 self.check(loc != dest, f"{name}: undelivered cargo sitting at its destination")
             for vessel_id, v in world.vessels.items():

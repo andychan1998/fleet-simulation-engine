@@ -71,7 +71,7 @@ The stress test prints a seed on failure; replay it with `FLEETSIM_SEED=<seed> p
 ### Large world (on request)
 
 ```
-FLEETSIM_LARGE=1 python -m unittest tests.test_large_world -v    # about a minute
+FLEETSIM_LARGE=1 python -m unittest tests.test_large_world -v    # under a minute
 ```
 
 Skipped in the normal run. It drives a random world of 100 ports and 1,000 ships for 20 ticks (about 4,000 commands), checks the same kinds of rules as the stress test, and prints the engine's speed per command type and peak memory. Change the size with `FLEETSIM_LARGE_PORTS`, `FLEETSIM_LARGE_SHIPS`, `FLEETSIM_LARGE_TICKS` and `FLEETSIM_LARGE_COMMANDS_PER_TICK`.
@@ -79,7 +79,7 @@ Skipped in the normal run. It drives a random world of 100 ports and 1,000 ships
 ### Speed and memory
 
 ```
-python tools/benchmark.py                                   # standard sizes, one to two minutes
+python tools/benchmark.py                                   # standard sizes, under a minute
 python tools/benchmark.py speed --ports 50 --ships 1000     # one world size
 python tools/benchmark.py memory --ports 50 --ships 1000 --ticks 1000
 ```
@@ -93,7 +93,18 @@ python tools/mutation_test.py                            # every engine file, ab
 python tools/mutation_test.py --file fleetsim/model.py   # one file, faster
 ```
 
-This mutation test makes one small change at a time to the engine (flips a comparison, changes a number, deletes a line, forces an `if`), runs the whole test suite against each changed copy, and lists any change that no test caught. Three changes can't alter what the program does, so no test can catch them; they were checked by hand and are reported separately. When this was written, every other change was caught. Your files are never modified: each change is made in a temporary copy.
+This mutation test makes one small change at a time to the engine (flips a comparison, changes a number, deletes a line, forces an `if`), runs the whole test suite against each changed copy, and lists any change that no test caught. Four changes can't alter what the program does, so no test can catch them; they were checked by hand and are reported separately. When this was written, every other change was caught. Your files are never modified: each change is made in a temporary copy.
+
+### Coverage
+
+```
+pip install "coverage>=7.10"     # a measuring tool only; the engine and tests don't use it
+coverage run -m unittest
+coverage combine
+coverage report
+```
+
+Settings are in `.coveragerc`: branches are counted as well as lines, and the tests that run the real program as a separate process are measured too. `coverage report` fails if coverage is below 100%. When this was written, it was 100% of lines and branches.
 
 ## Layout
 

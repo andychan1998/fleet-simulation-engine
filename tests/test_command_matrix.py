@@ -201,7 +201,7 @@ def ship(payload):
 
 def total_units(world):
     on_ship = sum(sum(v.cargo.values()) for v in world.vessels.values())
-    return on_ship + sum(world.dock_cargo.values()) + world.delivered
+    return on_ship + sum(q for _, _, q in world.cargo_entries()) + world.delivered
 
 
 class CommandMatrixTests(unittest.TestCase):

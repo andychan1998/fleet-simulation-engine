@@ -137,7 +137,7 @@ class LargeWorld:
             if planned.state != DOCKED or rng.random() < 0.2:
                 return cmd(rng.choice(["undock", "dock"]), vessel_id=vessel_id), False
             here = committed.location
-            on_dock = [d for (loc, d) in sim.planned.dock_cargo if loc == here] or [rng.randrange(self.ports)]
+            on_dock = list(sim.planned.docks.get(here, {})) or [rng.randrange(self.ports)]
             on_ship = list(planned.cargo) or [rng.randrange(self.ports)]
             return rng.choice([
                 cmd("load", vessel_id=vessel_id, destination=rng.choice(on_dock)),
@@ -202,10 +202,10 @@ class LargeWorld:
             for other_id, other in after.vessels.items():
                 if other_id != vessel_id:
                     self.fail_if(other != planned_before.vessels[other_id], f"{name} {vessel_id} changed {other_id}")
-            for key in set(after.dock_cargo) | set(planned_before.dock_cargo):
-                if key[0] != location:
-                    self.fail_if(after.dock_cargo.get(key) != planned_before.dock_cargo.get(key),
-                                 f"{name} {vessel_id} changed the dock at {key[0]}")
+            for port in set(after.docks) | set(planned_before.docks):
+                if port != location:
+                    self.fail_if(after.docks.get(port) != planned_before.docks.get(port),
+                                 f"{name} {vessel_id} changed the dock at {port}")
             if name in CARGO_COMMANDS:
                 ops = planned_ops_at(sim, location)
                 limit = sim.dock_throughput[location]
@@ -218,7 +218,7 @@ class LargeWorld:
         self.fail_if(response["payload"] != world.to_payload(), "tick response isn't the committed state")
         self.fail_if(len(self.sim.history) != world.tick + 1, "history length doesn't match the tick")
         self.fail_if(total_units(world) != self.units_added, "cargo not conserved")
-        self.fail_if(any(q <= 0 for q in world.dock_cargo.values()), "dock entry with quantity 0")
+        self.fail_if(any(q <= 0 for _, _, q in world.cargo_entries()), "dock entry with quantity 0")
         for vessel_id, vessel in world.vessels.items():
             self.fail_if(any(q <= 0 for q in vessel.cargo.values()), f"{vessel_id} has an empty cargo entry")
             if vessel.arrives_at_tick is not None:

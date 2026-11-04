@@ -1,5 +1,7 @@
-# Decision: cargo is listed in order of first arrival, and entries that reach
-# zero are removed, so cargo that comes back is listed at the end.
+# Decision: dock cargo is listed port by port, lowest port first, and within a
+# port in order of first arrival. A ship lists its cargo in order of first
+# arrival. Entries that reach zero are removed, so cargo that comes back is
+# listed at the end.
 # (Ship order is checked in tests/test_output_order.py, since a transcript
 # compares JSON objects without regard to key order.)
 
@@ -20,3 +22,7 @@
 # duplicate manifest entries add up into one entry
 > {"command":"tick","parameters":{"cargo_manifest":[{"location":0,"destination":2,"quantity":2},{"location":0,"destination":2,"quantity":3}]}}
 <~ {"payload":{"cargo":[{"location":0,"destination":2,"quantity":6}]}}
+
+# cargo arriving at port 2 before port 1 is still listed port by port
+> {"command":"tick","parameters":{"cargo_manifest":[{"location":2,"destination":0,"quantity":1},{"location":1,"destination":0,"quantity":1},{"location":2,"destination":1,"quantity":1}]}}
+<~ {"payload":{"cargo":[{"location":0,"destination":2,"quantity":6},{"location":1,"destination":0,"quantity":1},{"location":2,"destination":0,"quantity":1},{"location":2,"destination":1,"quantity":1}]}}

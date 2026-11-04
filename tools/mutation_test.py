@@ -55,6 +55,11 @@ KNOWN_HARMLESS = [
         "why": "real version numbers have five parts, so none is exactly (3, 9)",
     },
     {
+        "file": "fleetsim/simulation.py", "function": "_commit", "change": "condition always True",
+        "code": "if vessel.state == DOCKED:",
+        "why": "only docked ships can have cargo changes pending, so listing idle ships too adds 0 operations",
+    },
+    {
         "file": "fleetsim/model.py", "function": "transfer_ops", "change": "> -> >=",
         "code": "if change > 0:",
         "why": "the two branches differ only when change is 0, and then both add 0",

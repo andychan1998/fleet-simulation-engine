@@ -1,0 +1,12 @@
+# Settings for coverage.py; see "Coverage" in README.md.
+# Only for measuring coverage: the engine and tests don't need it.
+[run]
+branch = True
+source = fleetsim
+# Also measure the tests that run the real program as a separate process.
+parallel = True
+patch = subprocess
+
+[report]
+fail_under = 100
+show_missing = True

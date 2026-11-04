@@ -9,20 +9,21 @@ planned    committed + every command accepted since the last tick.
 Commands are checked against the committed state (e.g. set_destination needs
 the ship to be idle as of the last tick) and their effects go into planned.
 
-A handler that changes anything works on a copy of planned and only replaces
-planned once the whole command has succeeded, so a rejected command never
-leaves a partial change behind.
+A handler that changes anything works on a Draft of planned (model.py) and
+only replaces planned once the whole command has succeeded, so a rejected
+command never leaves a partial change behind. A Draft copies only what the
+command touches; everything else is shared with the state it started from.
 
 History
 -------
-Every committed state is kept in `history`, indexed by tick. A committed state
-is never modified after it is committed (handlers and tick work on copies), so
-history can keep the objects themselves without copying them again.
+Every committed state is kept in `history`, indexed by tick. States are
+read-only (model.py), so history keeps the objects themselves, and successive
+entries share every ship and port that didn't change.
 """
 
 from __future__ import annotations
 
-from fleetsim.model import DOCKED, IDLE, TRANSIT, World, add_units, take_unit, transfer_ops
+from fleetsim.model import DOCKED, IDLE, TRANSIT, Draft, World, add_units, read_only, take_unit, transfer_ops
 from fleetsim.params import (
     CommandError,
     check_index,
@@ -43,6 +44,7 @@ class Simulation:
         self.committed: World | None = None
         self.planned: World | None = None
         self.history: list[World] = []  # history[t] is the committed state at tick t
+        self._docked_at: dict[int, list[str]] = {}  # location -> ships docked there as of the last tick
         self._handlers = {
             "init": self._init,
             "tick": self._tick,
@@ -83,8 +85,9 @@ class Simulation:
 
         self.travel_times = travel_times
         self.dock_throughput = dock_throughput
-        world = World(tick=0, vessels=vessels)
-        _add_manifest(world, manifest)
+        draft = Draft(World(tick=0, vessels=read_only(vessels)))
+        _add_manifest(draft, manifest)
+        world = draft.build()
         self._commit(world)
         return world.to_payload()
 
@@ -92,12 +95,13 @@ class Simulation:
         # Check the manifest first: a bad entry rejects the whole tick.
         manifest = parse_manifest(params.get("cargo_manifest"), self.num_locations)
 
-        world = self.planned.clone()  # 1. pending commands take effect
-        world.tick += 1  # 2. advance the clock
-        for vessel in world.vessels.values():  # 3. arrivals
-            if vessel.state == TRANSIT and vessel.arrives_at_tick <= world.tick:
-                vessel.make_idle(vessel.destination)
-        _add_manifest(world, manifest)  # 4. new cargo lands on the docks
+        draft = Draft(self.planned)  # 1. pending commands take effect
+        draft.tick += 1  # 2. advance the clock
+        for vessel_id, vessel in self.planned.vessels.items():  # 3. arrivals
+            if vessel.state == TRANSIT and vessel.arrives_at_tick <= draft.tick:
+                draft.vessels[vessel_id] = vessel.idle(vessel.destination)
+        _add_manifest(draft, manifest)  # 4. new cargo lands on the docks
+        world = draft.build()
         self._commit(world)  # 5. save to history, 6. start a fresh plan
         return world.to_payload()
 
@@ -123,18 +127,18 @@ class Simulation:
             raise CommandError(f"vessel {vessel_id} is not idle")
 
         here = current.location
-        world = self.planned.clone()
-        vessel = world.vessels[vessel_id]
+        draft = Draft(self.planned)
+        vessel = draft.vessels[vessel_id]
         if destination == here:
             # A trip to where the ship already is: cancel any pending trip or dock.
-            vessel.make_idle(here)
+            draft.vessels[vessel_id] = vessel.idle(here)
         else:
             # Replaces any pending trip or dock. The trip's clock starts now,
             # at the tick the command is issued.
-            arrives = world.tick + self.travel_times[here][destination]
-            vessel.make_transit(here, destination, arrives)
-        self.planned = world
-        return world.to_payload()
+            arrives = draft.tick + self.travel_times[here][destination]
+            draft.vessels[vessel_id] = vessel.in_transit(here, destination, arrives)
+        self.planned = draft.build()
+        return self.planned.to_payload()
 
     def _dock(self, params: dict) -> dict:
         vessel_id = self._vessel_id(params)
@@ -149,10 +153,10 @@ class Simulation:
         else:
             raise CommandError(f"vessel {vessel_id} is not idle")
 
-        world = self.planned.clone()
-        world.vessels[vessel_id].make_docked(committed.location)
-        self.planned = world
-        return world.to_payload()
+        draft = Draft(self.planned)
+        draft.vessels[vessel_id] = planned.docked(committed.location)
+        self.planned = draft.build()
+        return self.planned.to_payload()
 
     def _undock(self, params: dict) -> dict:
         vessel_id = self._vessel_id(params)
@@ -165,10 +169,10 @@ class Simulation:
         else:
             raise CommandError(f"vessel {vessel_id} is not docked")
 
-        world = self.planned.clone()
-        world.vessels[vessel_id].make_idle(committed.location)
-        self.planned = world
-        return world.to_payload()
+        draft = Draft(self.planned)
+        draft.vessels[vessel_id] = planned.idle(committed.location)
+        self.planned = draft.build()
+        return self.planned.to_payload()
 
     # ---- cargo ----
 
@@ -177,18 +181,18 @@ class Simulation:
         destination = check_index(get(params, "destination"), "destination", self.num_locations)
         self._require_docked(vessel_id)
 
-        world = self.planned.clone()
-        _move_dock_to_vessel(world, vessel_id, destination)
-        return self._apply_cargo_change(world, vessel_id)
+        draft = Draft(self.planned)
+        _move_dock_to_vessel(draft, vessel_id, destination)
+        return self._apply_cargo_change(draft, vessel_id)
 
     def _unload(self, params: dict) -> dict:
         vessel_id = self._vessel_id(params)
         destination = check_index(get(params, "destination"), "destination", self.num_locations)
         self._require_docked(vessel_id)
 
-        world = self.planned.clone()
-        _move_vessel_to_dock(world, vessel_id, destination)
-        return self._apply_cargo_change(world, vessel_id)
+        draft = Draft(self.planned)
+        _move_vessel_to_dock(draft, vessel_id, destination)
+        return self._apply_cargo_change(draft, vessel_id)
 
     def _swap(self, params: dict) -> dict:
         vessel_id = self._vessel_id(params)
@@ -202,11 +206,11 @@ class Simulation:
             # the ship or dock has (not even the order the ship's cargo is listed in).
             return self.planned.to_payload()
 
-        world = self.planned.clone()
+        draft = Draft(self.planned)
         # Both halves must succeed. With different destinations, their order doesn't matter.
-        _move_vessel_to_dock(world, vessel_id, unload_destination)
-        _move_dock_to_vessel(world, vessel_id, load_destination)
-        return self._apply_cargo_change(world, vessel_id)
+        _move_vessel_to_dock(draft, vessel_id, unload_destination)
+        _move_dock_to_vessel(draft, vessel_id, load_destination)
+        return self._apply_cargo_change(draft, vessel_id)
 
     def _require_docked(self, vessel_id: str) -> None:
         """Cargo commands need the ship docked as of the last tick and not about to leave."""
@@ -215,20 +219,19 @@ class Simulation:
         if self.planned.vessels[vessel_id].state != DOCKED:
             raise CommandError(f"vessel {vessel_id} is undocking")
 
-    def _apply_cargo_change(self, world: World, vessel_id: str) -> dict:
+    def _apply_cargo_change(self, draft: Draft, vessel_id: str) -> dict:
         """Accept a cargo change if the dock can do it before the next tick."""
-        location = world.vessels[vessel_id].location
+        location = draft.vessels[vessel_id].location
         ops = 0
-        for other_id, before in self.committed.vessels.items():
-            if before.state == DOCKED and before.location == location:
-                ops += transfer_ops(before.cargo, world.vessels[other_id].cargo)
+        for other_id in self._docked_at.get(location, ()):
+            ops += transfer_ops(self.committed.vessels[other_id].cargo, draft.vessels[other_id].cargo)
         limit = self.dock_throughput[location]
         if ops > limit:
             raise CommandError(
                 f"transfer of {ops} operations exceeds dock throughput of {limit} at location {location}"
             )
-        self.planned = world
-        return world.to_payload()
+        self.planned = draft.build()
+        return self.planned.to_payload()
 
     # ---- helpers ----
 
@@ -236,7 +239,11 @@ class Simulation:
         """Make `world` the new committed state, record it, and start a fresh plan from it."""
         self.committed = world
         self.history.append(world)
-        self.planned = world.clone()
+        self.planned = world  # read-only, so the plan can start as the same object
+        self._docked_at = {}
+        for vessel_id, vessel in world.vessels.items():
+            if vessel.state == DOCKED:
+                self._docked_at.setdefault(vessel.location, []).append(vessel_id)
 
     def _vessel_id(self, params: dict) -> str:
         vessel_id = check_str(get(params, "vessel_id"), "vessel_id")
@@ -245,25 +252,29 @@ class Simulation:
         return vessel_id
 
 
-def _add_manifest(world: World, manifest: list[tuple[int, int, int]]) -> None:
+def _add_manifest(draft: Draft, manifest: list[tuple[int, int, int]]) -> None:
     for location, destination, quantity in manifest:
-        add_units(world.dock_cargo, (location, destination), quantity)
+        add_units(draft.dock_cargo(location), destination, quantity)
 
 
-def _move_dock_to_vessel(world: World, vessel_id: str, destination: int) -> None:
-    vessel = world.vessels[vessel_id]
+def _move_dock_to_vessel(draft: Draft, vessel_id: str, destination: int) -> None:
+    vessel = draft.vessels[vessel_id]
     here = vessel.location
-    if not take_unit(world.dock_cargo, (here, destination)):
+    if not take_unit(draft.dock_cargo(here), destination):
         raise CommandError(f"no cargo for destination {destination} at location {here}")
-    add_units(vessel.cargo, destination)
+    cargo = dict(vessel.cargo)
+    add_units(cargo, destination)
+    draft.vessels[vessel_id] = vessel.with_cargo(cargo)
 
 
-def _move_vessel_to_dock(world: World, vessel_id: str, destination: int) -> None:
-    vessel = world.vessels[vessel_id]
+def _move_vessel_to_dock(draft: Draft, vessel_id: str, destination: int) -> None:
+    vessel = draft.vessels[vessel_id]
     here = vessel.location
-    if not take_unit(vessel.cargo, destination):
+    cargo = dict(vessel.cargo)
+    if not take_unit(cargo, destination):
         raise CommandError(f"vessel {vessel_id} has no cargo for destination {destination}")
+    draft.vessels[vessel_id] = vessel.with_cargo(cargo)
     if destination == here:
-        world.delivered += 1  # delivered: the unit leaves the simulation
+        draft.delivered += 1  # delivered: the unit leaves the simulation
     else:
-        add_units(world.dock_cargo, (here, destination))
+        add_units(draft.dock_cargo(here), destination)
